@@ -10,15 +10,18 @@ document.addEventListener("DOMContentLoaded", () => {
       const response = await fetch("/activities");
       const activities = await response.json();
 
-      // Clear loading message
+      // Clear loading message and activity select (keep default option)
       activitiesList.innerHTML = "";
+      Array.from(activitySelect.options)
+        .slice(1)
+        .forEach((opt) => opt.remove());
 
       // Populate activities list
       Object.entries(activities).forEach(([name, details]) => {
         const activityCard = document.createElement("div");
         activityCard.className = "activity-card";
 
-        const spotsLeft = details.max_participants - details.participants.length;
+        const spotsLeft = details.max_participants - (details.participants?.length || 0);
 
         activityCard.innerHTML = `
           <h4>${name}</h4>
@@ -26,6 +29,57 @@ document.addEventListener("DOMContentLoaded", () => {
           <p><strong>Schedule:</strong> ${details.schedule}</p>
           <p><strong>Availability:</strong> ${spotsLeft} spots left</p>
         `;
+
+        // Participants section
+        const participantsSection = document.createElement("div");
+        participantsSection.className = "participants-section";
+
+        const participantsTitle = document.createElement("h5");
+        participantsTitle.textContent = "Participants";
+        participantsSection.appendChild(participantsTitle);
+
+        const ul = document.createElement("ul");
+        ul.className = "participants-list";
+
+        const participants = details.participants || [];
+        if (participants.length === 0) {
+          const li = document.createElement("li");
+          li.className = "participant-item";
+          const noSpan = document.createElement("span");
+          noSpan.className = "no-participants";
+          noSpan.textContent = "No participants yet";
+          li.appendChild(noSpan);
+          ul.appendChild(li);
+        } else {
+          participants.forEach((p) => {
+            const li = document.createElement("li");
+            li.className = "participant-item";
+
+            const badge = document.createElement("span");
+            badge.className = "participant-badge";
+            const namePart = String(p || "");
+            const initials =
+              (namePart
+                .split("@")[0]
+                .split(/[._\-\s]+/)
+                .map((s) => s[0] || "")
+                .slice(0, 2)
+                .join("")
+                .toUpperCase()) || "?";
+            badge.textContent = initials;
+
+            const nameSpan = document.createElement("span");
+            nameSpan.className = "participant-name";
+            nameSpan.textContent = p;
+
+            li.appendChild(badge);
+            li.appendChild(nameSpan);
+            ul.appendChild(li);
+          });
+        }
+
+        participantsSection.appendChild(ul);
+        activityCard.appendChild(participantsSection);
 
         activitiesList.appendChild(activityCard);
 
@@ -60,11 +114,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
       if (response.ok) {
         messageDiv.textContent = result.message;
-        messageDiv.className = "success";
+        messageDiv.className = "message success";
         signupForm.reset();
+        // Refresh activities to show updated participants and availability
+        await fetchActivities();
       } else {
         messageDiv.textContent = result.detail || "An error occurred";
-        messageDiv.className = "error";
+        messageDiv.className = "message error";
       }
 
       messageDiv.classList.remove("hidden");
@@ -75,7 +131,7 @@ document.addEventListener("DOMContentLoaded", () => {
       }, 5000);
     } catch (error) {
       messageDiv.textContent = "Failed to sign up. Please try again.";
-      messageDiv.className = "error";
+      messageDiv.className = "message error";
       messageDiv.classList.remove("hidden");
       console.error("Error signing up:", error);
     }
